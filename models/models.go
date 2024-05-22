@@ -21,3 +21,9 @@ type Tokendata struct {
 	Token      string    `json:"token"`
 	Expires_At time.Time `json:"expires_at"`
 }
+
+type LoginUser struct {
+	LoginMethod int    `json:"login_method"` // 1-token,2-cookie
+	Email       string `json:"email"`
+	Password    string `json:"password"`
+}

@@ -4,13 +4,22 @@ import (
 	"binance/database"
 	"binance/models"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"time"
+
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
+
+const (
+	cookie = iota
+	token
+)
+
+var LoginMethod int
 
 // Register route will register the user
 func Register(w http.ResponseWriter, r *http.Request) {
@@ -43,7 +52,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 // Login route will login the user
 func Login(w http.ResponseWriter, r *http.Request) {
-	var user models.User
+	var user models.LoginUser
 
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
@@ -71,34 +80,85 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	random := uuid.New()
-	expiry_time := time.Now().Add(30 * time.Minute)
+	// random := uuid.New()
+	// expiry_time := time.Now().Add(30 * time.Minute)
 
-	count, err := database.GetTokenCount(user.Email)
-	if err != nil {
-		log.Println("Error in getting the token count for user ", err)
-		w.Write([]byte("Error in getting the token count"))
-		return
-	}
-	if count != 0 {
-		err := database.UpdateToken(user.Email, random.String(), expiry_time)
+	// count, err := database.GetTokenCount(user.Email)
+	// if err != nil {
+	// 	log.Println("Error in getting the token count for user ", err)
+	// 	w.Write([]byte("Error in getting the token count"))
+	// 	return
+	// }
+	// if count != 0 {
+	// 	err := database.UpdateToken(user.Email, random.String(), expiry_time)
+	// 	if err != nil {
+	// 		log.Println("Error in updating the token ", err)
+	// 		w.Write([]byte("Error in updating the token"))
+	// 		return
+	// 	}
+	// } else {
+
+	// 	err = database.InsertTokenToDB(user.Email, random.String(), expiry_time)
+	// 	if err != nil {
+	// 		log.Println("Error in inserting token of the user ", err)
+	// 		w.Write([]byte("Error in inserting the token"))
+	// 		return
+	// 	}
+	// }
+	random := uuid.New()
+	loginMethod := user.LoginMethod
+
+	LoginMethod = loginMethod
+
+	fmt.Println("Login method is ", LoginMethod+10)
+
+	// loginMethod==1 token based, loginMethod==2 cookie based
+
+	if loginMethod == 1 {
+
+		expiry_time := time.Now().Add(30 * time.Minute)
+
+		count, err := database.GetTokenCount(user.Email)
 		if err != nil {
-			log.Println("Error in updating the token ", err)
-			w.Write([]byte("Error in updating the token"))
+			log.Println("Error in getting the token count for user ", err)
+			w.Write([]byte("Error in getting the token count"))
 			return
 		}
+		if count != 0 {
+			err := database.UpdateToken(user.Email, random.String(), expiry_time)
+			if err != nil {
+				log.Println("Error in updating the token ", err)
+				w.Write([]byte("Error in updating the token"))
+				return
+			}
+		} else {
+
+			err = database.InsertTokenToDB(user.Email, random.String(), expiry_time)
+			if err != nil {
+				log.Println("Error in inserting token of the user ", err)
+				w.Write([]byte("Error in inserting the token"))
+				return
+			}
+		}
+		w.Header().Set("token", random.String())
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("User login successfull via Token. \n"))
+		w.Write([]byte(fmt.Sprintf("Token is %s ", random.String())))
 	} else {
 
-		err = database.InsertTokenToDB(user.Email, random.String(), expiry_time)
-		if err != nil {
-			log.Println("Error in inserting token of the user ", err)
-			w.Write([]byte("Error in inserting the token"))
-			return
+		cookie := http.Cookie{
+			Name:     "cookie",
+			Value:    random.String(),
+			Path:     "/",
+			MaxAge:   10,
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteLaxMode,
 		}
+
+		http.SetCookie(w, &cookie)
+		w.Write([]byte("User login successfull via Cookie."))
 	}
-	w.Header().Set("token", random.String())
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("User login successfull"))
 
 }
 
@@ -138,6 +198,9 @@ func GetBinanceData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	headerData := r.Header.Get("token")
+
+	fmt.Println("Cookie is ", cookie)
+	fmt.Println("Token is ", token)
 
 	log.Println("Header data is ", headerData)
 	w.Write([]byte(jsonData))
