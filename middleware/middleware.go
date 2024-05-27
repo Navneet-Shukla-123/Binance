@@ -47,6 +47,9 @@ func AuthenticateByToken(f http.HandlerFunc) http.HandlerFunc {
 
 // AuthenticateByCookie middleware will authenticate the user by email
 func AuthenticateByCookie(f http.HandlerFunc) http.HandlerFunc {
+
+	log.Println("Middleware is running ... ")
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("cookie")
 		if err != nil {
